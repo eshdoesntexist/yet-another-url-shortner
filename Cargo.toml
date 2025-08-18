@@ -1,0 +1,15 @@
+[package]
+name = "yet-another-url-shortner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = { version = "0.8.4", features = ["macros"] }
+chrono = { version = "0.4.41", features = ["serde"] }
+dotenvy = "0.15.7"
+nanoid = "0.4.0"
+serde = "1.0.219"
+sqlx = { version = "0.8.6", features = ["sqlite", "chrono", "runtime-tokio-native-tls"] }
+tokio = { version = "1.47.1", features = ["full", "tracing"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["chrono"] }
