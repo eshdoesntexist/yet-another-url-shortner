@@ -1,7 +1,7 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use sqlx::{Pool, Sqlite};
 
-use crate::{cache::TtlCache};
+use crate::cache::TtlCache;
 
 #[derive(Clone)]
 pub struct UrlStore {
@@ -32,8 +32,7 @@ impl UrlStore {
             let value = if let Some(row) =
                 sqlx::query!("SELECT longurl from shorturls WHERE shorturl = ?", key)
                     .fetch_optional(&self.sqlite_pool)
-                    .await
-                   ?
+                    .await?
             {
                 row.longurl
             } else {
@@ -51,7 +50,7 @@ impl UrlStore {
     }
     pub async fn insert(&self, value: String) -> Result<(), String> {
         let shorturl = self.generate_short_url();
-sqlx::query!(
+        sqlx::query!(
             "INSERT INTO shorturls (shorturl, longurl) VALUES (?, ?)",
             shorturl,
             value
@@ -60,24 +59,26 @@ sqlx::query!(
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok(())
+        Ok(())
     }
 
     pub async fn get_all(&self) -> Result<Vec<ShortUrlRow>, sqlx::Error> {
-         sqlx::query_as!(ShortUrlRow,
+        sqlx::query_as!(
+            ShortUrlRow,
             "SELECT * FROM shorturls ORDER BY created_at DESC"
-        ).fetch_all(&self.sqlite_pool)
-            .await
+        )
+        .fetch_all(&self.sqlite_pool)
+        .await
     }
 
-     fn generate_short_url(&self) -> String {
+    fn generate_short_url(&self) -> String {
         nanoid::nanoid!(8)
     }
 }
 
-#[derive(Debug, Clone , sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow)]
 pub struct ShortUrlRow {
-   pub shorturl: String,
-   pub longurl: String,
-   pub created_at: NaiveDateTime,
+    pub shorturl: String,
+    pub longurl: String,
+    pub created_at: NaiveDateTime,
 }

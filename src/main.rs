@@ -1,19 +1,22 @@
 use crate::{
-    cache::TtlCache, errors::{AppError, AppResult}, partials::{page, url_table}, url_store::UrlStore
+    cache::TtlCache,
+    errors::{AppError, AppResult},
+    partials::{page, url_table},
+    url_store::UrlStore,
 };
 use axum::{
     Form, debug_handler,
     extract::{Path, State},
     http::StatusCode,
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{IntoResponse, Redirect, Response},
 };
 use std::{env, time::Duration};
 use tokio::signal::ctrl_c;
 
 mod cache;
 mod errors;
-mod url_store;
 mod partials;
+mod url_store;
 
 #[tokio::main]
 async fn main() {
@@ -63,7 +66,7 @@ async fn shutdown_signal() {
 
 async fn get_hompeage(State(u): State<UrlStore>) -> Response {
     let values = u.get_all().await.unwrap();
-   let homepage = page("Home" ,url_table(values));
+    let homepage = page("Home", url_table(values));
 
     (StatusCode::OK, homepage).into_response()
 }

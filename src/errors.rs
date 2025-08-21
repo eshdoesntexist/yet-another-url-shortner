@@ -26,7 +26,6 @@ impl AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
         let status = match self {
-            
             AppError::DatabaseError(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             AppError::CustomError { code, .. } => code,
         };
