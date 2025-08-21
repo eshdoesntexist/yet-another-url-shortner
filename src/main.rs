@@ -1,12 +1,20 @@
-use crate::{cache::TtlCache, url_store::UrlStore};
-use axum::{
-    debug_handler, extract::{Path, State}, http::StatusCode, response::{Html, IntoResponse, Redirect, Response}, Form
+use crate::{
+    cache::TtlCache, errors::{AppError, AppResult}, partials::{page, url_table}, url_store::UrlStore
 };
-use std::{env, sync::Arc, time::Duration};
+use axum::{
+    Form, debug_handler,
+    extract::{Path, State},
+    http::StatusCode,
+    response::{Html, IntoResponse, Redirect, Response},
+};
+use std::{env, time::Duration};
 use tokio::signal::ctrl_c;
 
 mod cache;
+mod errors;
 mod url_store;
+mod partials;
+
 #[tokio::main]
 async fn main() {
     // Initialize the tracing subscriber for logging
@@ -23,7 +31,7 @@ async fn main() {
             .expect("Failed to create SQLite pool");
 
     // Initialize the cache with a TTL of 60 seconds and a cleanup interval of 10 seconds
-    let cache = TtlCache::new(Duration::from_secs(60), Duration::from_secs(10));
+    let cache = TtlCache::new(Duration::from_secs(60), Duration::from_secs(10)).await;
 
     let url_store = url_store::UrlStore::new(sqlite_pool.clone(), cache.clone()).await;
 
@@ -55,63 +63,10 @@ async fn shutdown_signal() {
 
 async fn get_hompeage(State(u): State<UrlStore>) -> Response {
     let values = u.get_all().await.unwrap();
-    let table = if values.is_empty() {
-        "no shortened URLs found".to_string()
-    } else {
-        let rows = values
-            .into_iter()
-            .map(|(short, long, c)| {
-                format!(
-                    "<tr><td>{}</td><td>{}</td><td>{}</td></tr>",
-                    short,
-                    long,
-                    c.to_rfc3339()
-                )
-            })
-            .reduce(|a, b| a + &b)
-            .unwrap_or_default();
-        format!(
-            r#"
-        <table>
-            <thead>
-                <tr>
-                    <th>Short URL</th>
-                    <th>Long URL</th> 
-                    <th>Created At</th>
-                </tr>
-            </thead>
-            <tbody>
-                {}
-            </tbody>
-        </table>
-    "#,
-            rows
-        )
-    };
-    let html = format!(
-        r#"
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>URL Shortener</title>
-        </head>
-        <body>
-            <h1>Welcome to the URL Shortener</h1>
-            <form action="/add" method="post">
-                <input type="text" name="url" placeholder="Enter URL" required>
-                <button type="submit">Shorten</button>
-            </form>
-            <br />
-                {}
-        </body>
-        </html>
-        "#,
-        table
-    );
+   let homepage = page("Home" ,url_table(values));
 
-    (StatusCode::OK, Html(html)).into_response()
+    (StatusCode::OK, homepage).into_response()
 }
-
 
 #[derive(Debug, serde::Deserialize)]
 struct AddUrlForm {
@@ -130,19 +85,15 @@ async fn post_add_url(
     }
 }
 #[debug_handler]
-async fn get_redirect_to_url(Path(s): Path<String>, State(u): State<UrlStore>) -> Response {
-    match u.get(s).await {
-        Ok(Some(url)) => {
+async fn get_redirect_to_url(Path(s): Path<String>, State(u): State<UrlStore>) -> AppResult {
+    match u.get(s).await? {
+        Some(url) => {
             tracing::info!("Redirecting to URL: {}", url);
-            axum::response::Redirect::to(&url).into_response()
+            Ok(axum::response::Redirect::to(&url).into_response())
         }
-        Ok(None) => {
+        None => {
             tracing::warn!("URL not found");
-            StatusCode::NOT_FOUND.into_response()
-        }
-        Err(e) => {
-            tracing::error!("Error retrieving URL: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("error: {e}")).into_response()
+            Err(AppError::custom(StatusCode::NOT_FOUND, "Url not found"))
         }
     }
 }

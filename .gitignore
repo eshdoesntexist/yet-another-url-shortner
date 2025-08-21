@@ -1,3 +1,5 @@
 /target
 .env
-data.db
+data.sqlite
+*.db
+*.sqlite

@@ -1,7 +1,7 @@
-use chrono::{DateTime, Utc};
-use sqlx::{Pool, Sqlite, SqliteConnection};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use sqlx::{Pool, Sqlite};
 
-use crate::cache::{self, TtlCache};
+use crate::{cache::TtlCache};
 
 #[derive(Clone)]
 pub struct UrlStore {
@@ -23,7 +23,7 @@ impl UrlStore {
         }
     }
 
-    pub async fn get(&self, key: String) -> Result<Option<String>, String> {
+    pub async fn get(&self, key: String) -> Result<Option<String>, sqlx::Error> {
         //self.stats_tx.send(key.clone()).await.map_err(|e| e.to_string())?;
         let value = if let Some(maybe_url) = self.cache.get(&key).await {
             maybe_url
@@ -33,7 +33,7 @@ impl UrlStore {
                 sqlx::query!("SELECT longurl from shorturls WHERE shorturl = ?", key)
                     .fetch_optional(&self.sqlite_pool)
                     .await
-                    .map_err(|e| e.to_string())?
+                   ?
             {
                 row.longurl
             } else {
@@ -63,18 +63,11 @@ sqlx::query!(
     Ok(())
     }
 
-    pub async fn get_all(&self) -> Result<Vec<(String, String, DateTime<Utc>)>, String> {
-         sqlx::query!(
+    pub async fn get_all(&self) -> Result<Vec<ShortUrlRow>, sqlx::Error> {
+         sqlx::query_as!(ShortUrlRow,
             "SELECT * FROM shorturls ORDER BY created_at DESC"
         ).fetch_all(&self.sqlite_pool)
             .await
-            .map_err(|e| e.to_string()).and_then(|res| Ok(res.iter().map(| row| {
-                (
-                    row.shorturl.clone(),
-                    row.longurl.clone(),
-                    row.created_at.and_utc(),
-                )
-            }).collect::<Vec<_>>()))
     }
 
      fn generate_short_url(&self) -> String {
@@ -82,3 +75,9 @@ sqlx::query!(
     }
 }
 
+#[derive(Debug, Clone , sqlx::FromRow)]
+pub struct ShortUrlRow {
+   pub shorturl: String,
+   pub longurl: String,
+   pub created_at: NaiveDateTime,
+}

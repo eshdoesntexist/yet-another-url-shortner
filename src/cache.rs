@@ -6,10 +6,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use axum::http::header::CACHE_CONTROL;
 use tokio::{sync::RwLock, task::JoinHandle};
-
-use crate::cache;
 
 #[derive(Debug, Clone)]
 struct CacheEntry {
@@ -27,29 +24,27 @@ pub struct TtlCache {
 
 impl TtlCache {
     /// Create a new cache and start the cleaner immediately
-    pub fn new(ttl: Duration, cleanup_interval: Duration) -> Self {
+    pub async fn new(ttl: Duration, cleanup_interval: Duration) -> Self {
         let cache = Self {
             map: Arc::new(RwLock::new(HashMap::new())),
             ttl,
             stop_flag: Arc::new(AtomicBool::new(false)),
             cleaner_handle: Arc::new(RwLock::new(None)),
         };
-        let cache_clone = cache.clone();
-       tokio::spawn(async move {
-            // Spawn cleaner as part of construction
-            let mut lock = cache_clone.cleaner_handle.write().await;
-            *lock = Some(cache_clone._spawn_cleaner(cleanup_interval));
-        });
+
+        let mut lock = cache.cleaner_handle.write().await;
+        *lock = Some(cache._spawn_cleaner(cleanup_interval));
+        drop(lock);
         cache
     }
 
-   pub async fn insert(&self, key: String, value: String) {
+    pub async fn insert(&self, key: String, value: String) {
         let expiry = Instant::now() + self.ttl;
         let entry = CacheEntry { value, expiry };
         self.map.write().await.insert(key, entry);
     }
 
-   pub async fn get(&self, key: &str) -> Option<String> {
+    pub async fn get(&self, key: &str) -> Option<String> {
         let mut map = self.map.write().await;
         if let Some(entry) = map.get_mut(key) {
             let now = Instant::now();
