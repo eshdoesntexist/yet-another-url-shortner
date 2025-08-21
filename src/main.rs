@@ -34,7 +34,8 @@ async fn main() {
             .expect("Failed to create SQLite pool");
 
     // Initialize the cache with a TTL of 60 seconds and a cleanup interval of 10 seconds
-    let cache = TtlCache::new(Duration::from_secs(60), Duration::from_secs(10)).await;
+    let (cache, cleaner_handle) =
+        TtlCache::new(Duration::from_secs(60), Duration::from_secs(10)).await;
 
     let url_store = url_store::UrlStore::new(sqlite_pool.clone(), cache.clone()).await;
 
@@ -52,9 +53,9 @@ async fn main() {
         .await
         .expect("Failed to start server");
 
-    // Stop the cache cleaner and close the SQLite pool gracefully
-    cache.stop_cleaner().await;
+    //close the SQLite pool gracefully
     sqlite_pool.close().await;
+    cleaner_handle.abort();
     println!("Server has been shut down gracefully.");
 }
 

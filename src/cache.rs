@@ -1,9 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{sync::RwLock, task::JoinHandle};
@@ -18,24 +15,18 @@ struct CacheEntry {
 pub struct TtlCache {
     map: Arc<RwLock<HashMap<String, CacheEntry>>>,
     ttl: Duration,
-    stop_flag: Arc<AtomicBool>,
-    cleaner_handle: Arc<RwLock<Option<JoinHandle<()>>>>,
 }
 
 impl TtlCache {
     /// Create a new cache and start the cleaner immediately
-    pub async fn new(ttl: Duration, cleanup_interval: Duration) -> Self {
+    pub async fn new(ttl: Duration, cleanup_interval: Duration) -> (Self, JoinHandle<()>) {
         let cache = Self {
             map: Arc::new(RwLock::new(HashMap::new())),
             ttl,
-            stop_flag: Arc::new(AtomicBool::new(false)),
-            cleaner_handle: Arc::new(RwLock::new(None)),
         };
 
-        let mut lock = cache.cleaner_handle.write().await;
-        *lock = Some(cache._spawn_cleaner(cleanup_interval));
-        drop(lock);
-        cache
+        let cleaner = cache._spawn_cleaner(cleanup_interval);
+        (cache, cleaner)
     }
 
     pub async fn insert(&self, key: String, value: String) {
@@ -62,28 +53,17 @@ impl TtlCache {
     /// Internal: spawn the background cleaner
     fn _spawn_cleaner(&self, interval: Duration) -> JoinHandle<()> {
         let map = self.map.clone();
-        let stop_flag = self.stop_flag.clone();
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             loop {
                 tokio::time::sleep(interval).await;
-                if stop_flag.load(Ordering::Relaxed) {
-                    println!("🛑 Cache cleaner stopped");
-                    break;
-                }
                 let mut map = map.write().await;
                 let now = Instant::now();
                 map.retain(|_, entry| entry.expiry > now);
                 println!("🧹 Cache cleaned, {} keys remain", map.len());
             }
-        })
-    }
+        });
 
-    /// Stop the cleaner gracefully
-    pub async fn stop_cleaner(&self) {
-        self.stop_flag.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.cleaner_handle.write().await.take() {
-            let _ = handle.await;
-        }
+        handle
     }
 }
