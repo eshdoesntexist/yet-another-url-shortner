@@ -1,22 +1,28 @@
 use crate::{
     cache::TtlCache,
     errors::{AppError, AppResult},
-    partials::{page, url_table},
     url_store::UrlStore,
+    views::{DashboardPageBuilder, LoginFormPage, LoginFormPayload},
 };
 use axum::{
     Form, debug_handler,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Redirect, Response},
+    routing::get,
 };
-use std::{env, time::Duration};
+use bcrypt::{BcryptError, bcrypt};
+use serde::Deserialize;
+use std::{env, panic, time::Duration};
 use tokio::signal::ctrl_c;
+use tower_http::services::ServeDir;
 
 mod cache;
 mod errors;
-mod partials;
+mod handlers;
+//mod partials;
 mod url_store;
+mod views;
 
 #[tokio::main]
 async fn main() {
@@ -42,7 +48,9 @@ async fn main() {
     let router = axum::Router::new()
         .route("/", axum::routing::get(get_hompeage))
         .route("/add", axum::routing::post(post_add_url))
+        .route("/login", get(get_login).post(post_login))
         .route("/{s}", axum::routing::get(get_redirect_to_url))
+        .nest_service("/static", ServeDir::new("./static"))
         .with_state(url_store);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
@@ -67,7 +75,7 @@ async fn shutdown_signal() {
 
 async fn get_hompeage(State(u): State<UrlStore>) -> Response {
     let values = u.get_all().await.unwrap();
-    let homepage = page("Home", url_table(values));
+    let homepage = DashboardPageBuilder::new().set_rows(values);
 
     (StatusCode::OK, homepage).into_response()
 }
@@ -89,6 +97,7 @@ async fn post_add_url(
     }
 }
 #[debug_handler]
+#[tracing::instrument]
 async fn get_redirect_to_url(Path(s): Path<String>, State(u): State<UrlStore>) -> AppResult {
     match u.get(s).await? {
         Some(url) => {
@@ -100,4 +109,41 @@ async fn get_redirect_to_url(Path(s): Path<String>, State(u): State<UrlStore>) -
             Err(AppError::custom(StatusCode::NOT_FOUND, "Url not found"))
         }
     }
+}
+
+#[derive(Deserialize, Debug)]
+struct LoginPageQueryParams {
+    redirect_to: Option<String>,
+}
+
+#[tracing::instrument]
+async fn get_login(
+    Query(LoginPageQueryParams { redirect_to }): Query<LoginPageQueryParams>,
+) -> AppResult {
+    Ok(LoginFormPage::new()
+        .maybe_redirect_to(redirect_to)
+        .into_response())
+}
+
+#[tracing::instrument]
+async fn post_login(Form(data): Form<LoginFormPayload>) -> AppResult {
+    //TODO implement logic
+    Ok(LoginFormPage::new()
+        .set_prepopulated_email(data.email)
+        .maybe_redirect_to(data.redirect_to)
+        .show_invalid_credentials()
+        .into_response())
+}
+
+static HASH_COST: u32 = 10;
+
+async fn compare_pwd<'a>(hash: String, pwd: String) -> Result<bool, BcryptError> {
+    tokio::task::spawn_blocking(move || bcrypt::verify(pwd, &hash))
+        .await
+        .expect("bcrypt either panicked or task was cancelled")
+}
+async fn hash_pwd(plain_pwd: String) -> Result<String, BcryptError> {
+    tokio::task::spawn_blocking(move || bcrypt::hash(plain_pwd, HASH_COST))
+        .await
+        .expect("bcrypt either panicked or task was cancelled")
 }

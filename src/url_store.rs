@@ -3,7 +3,7 @@ use sqlx::{Pool, Sqlite};
 
 use crate::cache::TtlCache;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UrlStore {
     cache: TtlCache,
     sqlite_pool: Pool<Sqlite>,

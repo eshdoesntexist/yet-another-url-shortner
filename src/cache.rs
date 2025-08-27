@@ -11,7 +11,7 @@ struct CacheEntry {
     expiry: Instant,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TtlCache {
     map: Arc<RwLock<HashMap<String, CacheEntry>>>,
     ttl: Duration,
