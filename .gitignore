@@ -4,3 +4,4 @@ data.sqlite
 *.db
 *.sqlite
 node_modules
+styles.css

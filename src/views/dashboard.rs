@@ -48,7 +48,7 @@ impl Renderable for DashboardPageBuilder {
                             }
                             tbody #urltablebody {
                                 @for row in &self.rows {
-                                    UrlTableRow data=(row) hx=(false);
+                                    UrlTableRow data=(row);
                                 }
                             }
                         }
@@ -102,19 +102,13 @@ pub fn add_url_form() -> impl Renderable {
 
 pub struct UrlTableRow<'a> {
     data: &'a ShortUrlRowModel,
-    hx: bool,
 }
 
 impl<'a> UrlTableRow<'a> {
     pub fn new(row: &'a ShortUrlRowModel) -> Self {
         Self {
-            hx: false,
             data: row,
         }
-    }
-    pub fn is_hx(mut self, val: bool) -> Self {
-        self.hx = val;
-        self
     }
 }
 

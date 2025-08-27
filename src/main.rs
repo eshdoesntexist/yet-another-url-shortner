@@ -97,9 +97,9 @@ async fn post_add_url(
         }
         Ok(val) if is_hx => {
             tracing::debug!("this is an htmx request.");
-            UrlTableRow::new(&val).is_hx(is_hx).into_response()
+            UrlTableRow::new(&val).into_response()
         }
-        Ok(val) => Redirect::to("/").into_response(),
+        Ok(_val) => Redirect::to("/").into_response(),
     }
 }
 
