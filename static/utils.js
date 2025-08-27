@@ -35,15 +35,48 @@ const convertUtcTimeToLocal = (element) => {
    */
   element.textContent = Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
-    timeStyle: "short"
+    timeStyle: "short",
   }).format(date);
 };
 
 /**
- * Once the DOM is fully loaded:
- *   - Find all elements with a `data-time` attribute.
- *   - Convert their UTC datetime text into local date + time.
+ * On DOMContentLoaded (when the HTML is fully parsed):
+ *
+ * 1. Time Conversion:
+ *    - Selects all elements with a `data-time` attribute.
+ *    - Calls `convertUtcTimeToLocal` on each element to transform the UTC
+ *      datetime text into the user’s local date + time format.
+ *
+ * 2. Scroll-to-Top Button:
+ *    - Looks for the element with id="scrollTopBtn".
+ *    - The `if (!!btn)` check is used so the code only runs if the button
+ *      actually exists on the page (prevents errors on pages without it).
+ *    - If the button exists:
+ *        a. Listens for `scroll` events on the window:
+ *            - Shows the button (removes "hidden" class) when the page
+ *              is scrolled more than 50px down.
+ *            - Hides the button (adds "hidden" class) when near the top.
+ *        b. Listens for `click` events on the button:
+ *            - Smoothly scrolls the page back to the top.
  */
 document.addEventListener("DOMContentLoaded", () => {
+  // Convert all UTC timestamps into local time
   document.querySelectorAll("[data-time]").forEach(convertUtcTimeToLocal);
+
+  // Initialize scroll-to-top button logic
+  const btn = document.getElementById("scrollTopBtn");
+  if (!!btn) {
+    // safeguard: only add listeners if the button exists
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 50) {
+        btn.classList.remove("hidden");
+      } else {
+        btn.classList.add("hidden");
+      }
+    });
+
+    btn.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
 });
