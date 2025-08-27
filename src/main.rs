@@ -2,18 +2,18 @@ use crate::{
     cache::TtlCache,
     errors::{AppError, AppResult},
     url_store::UrlStore,
-    views::{DashboardPageBuilder, LoginFormPage, LoginFormPayload},
+    views::{DashboardPageBuilder, LoginFormPage, LoginFormPayload, UrlTableRow},
 };
 use axum::{
     Form, debug_handler,
-    extract::{Path, Query, State},
-    http::StatusCode,
+    extract::{FromRequestParts, Path, Query, State},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::get,
 };
-use bcrypt::{BcryptError, bcrypt};
+use bcrypt::BcryptError;
 use serde::Deserialize;
-use std::{env, panic, time::Duration};
+use std::{convert::Infallible, env, panic, time::Duration};
 use tokio::signal::ctrl_c;
 use tower_http::services::ServeDir;
 
@@ -86,14 +86,36 @@ struct AddUrlForm {
 }
 
 async fn post_add_url(
+    HxRequest(is_hx): HxRequest,
     State(u): State<UrlStore>,
     Form(AddUrlForm { url }): Form<AddUrlForm>,
 ) -> Response {
-    if let Err(e) = u.insert(url).await {
-        tracing::error!("Error inserting URL: {}", e);
-        (StatusCode::INTERNAL_SERVER_ERROR, format!("error: {e}")).into_response()
-    } else {
-        Redirect::to("/").into_response()
+    match u.insert(url).await {
+        Err(e) => {
+            tracing::error!("Error inserting URL: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("error: {e}")).into_response()
+        }
+        Ok(val) if is_hx => {
+            tracing::debug!("this is an htmx request.");
+            UrlTableRow::new(&val).is_hx(is_hx).into_response()
+        }
+        Ok(val) => Redirect::to("/").into_response(),
+    }
+}
+
+pub struct HxRequest(bool);
+
+impl<S> FromRequestParts<S> for HxRequest
+where
+    S: Send + Sync,
+{
+    type Rejection = Infallible;
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        // If the "Hx-Request" header is present, the value is always "true" as per https://htmx.org/reference/#request_headers
+        Ok(Self(parts.headers.contains_key("Hx-Request")))
     }
 }
 #[debug_handler]

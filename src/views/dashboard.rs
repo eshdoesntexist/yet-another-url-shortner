@@ -48,7 +48,7 @@ impl Renderable for DashboardPageBuilder {
                             }
                             tbody #urltablebody {
                                 @for row in &self.rows {
-                                    UrlTableRow data=(row) hx="";
+                                    UrlTableRow data=(row) hx=(false);
                                 }
                             }
                         }
@@ -78,6 +78,8 @@ pub fn add_url_form() -> impl Renderable {
                 hx-post="/add"
                 hx-target="#urltablebody"
                 hx-swap="afterbegin"
+                hx-on::after-request="this.reset(); this.querySelectorAll('input, button').forEach(el => el.disabled = false);"
+                hx-on::before-request="this.querySelectorAll('input, button').forEach(el => el.disabled = true);"
             {
                 label
                     for="add-url"
@@ -85,13 +87,13 @@ pub fn add_url_form() -> impl Renderable {
                 { "add" }
                 input
                     id="add-url"
-                    class="block w-full p-4 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                    class="disabled:opacity-50 disabled:cursor-not-allowed block w-full p-4 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                     placeholder="Add a new URL"
                     name="url"
                     required;
                 button
                     type="Add url"
-                    class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-8 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                    class="disabled:opacity-50 disabled:cursor-not-allowed text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-8 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 "
                 { "Add" }
             }
         }
@@ -100,19 +102,25 @@ pub fn add_url_form() -> impl Renderable {
 
 pub struct UrlTableRow<'a> {
     data: &'a ShortUrlRowModel,
-    hx: bool
+    hx: bool,
 }
 
 impl<'a> UrlTableRow<'a> {
     pub fn new(row: &'a ShortUrlRowModel) -> Self {
         Self {
             hx: false,
-            data: row
+            data: row,
         }
     }
-    pub fn is_hx(mut self ,val: bool) -> Self {
+    pub fn is_hx(mut self, val: bool) -> Self {
         self.hx = val;
         self
+    }
+}
+
+impl<'a> IntoResponse for UrlTableRow<'a> {
+    fn into_response(self) -> axum::response::Response {
+        self.render().into_response()
     }
 }
 
@@ -121,7 +129,6 @@ impl<'a> Renderable for UrlTableRow<'a> {
         let row = &self.data;
         maud! {
             tr
-                hx_on:load=""
                 class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
             {
                 th

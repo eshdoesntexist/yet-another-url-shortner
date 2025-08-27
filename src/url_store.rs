@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::{Pool, Sqlite};
 
 use crate::cache::TtlCache;
@@ -48,27 +48,35 @@ impl UrlStore {
         //TODO add way to report statistics
         return Ok(Some(value));
     }
-    pub async fn insert(&self, value: String) -> Result<(), String> {
+    pub async fn insert(&self, value: String) -> Result<ShortUrlRow, String> {
         let shorturl = self.generate_short_url();
+        let timestamp = Utc::now();
         sqlx::query!(
-            "INSERT INTO shorturls (shorturl, longurl) VALUES (?, ?)",
+            "INSERT INTO shorturls (shorturl, longurl , created_at) VALUES (?, ? , ?)",
             shorturl,
-            value
+            value,
+            timestamp
         )
         .execute(&self.sqlite_pool)
         .await
         .map_err(|e| e.to_string())?;
 
-        Ok(())
+        Ok(ShortUrlRow {
+            shorturl,
+            longurl: value,
+            created_at: timestamp,
+        })
     }
 
     pub async fn get_all(&self) -> Result<Vec<ShortUrlRow>, sqlx::Error> {
-        sqlx::query_as!(
-            ShortUrlRow,
-            "SELECT * FROM shorturls ORDER BY created_at DESC"
-        )
-        .fetch_all(&self.sqlite_pool)
-        .await
+        sqlx::query!("SELECT * FROM shorturls ORDER BY created_at DESC")
+            .map(|row| ShortUrlRow {
+                shorturl: row.shorturl,
+                longurl: row.longurl,
+                created_at: row.created_at.and_utc(),
+            })
+            .fetch_all(&self.sqlite_pool)
+            .await
     }
 
     fn generate_short_url(&self) -> String {
@@ -80,5 +88,5 @@ impl UrlStore {
 pub struct ShortUrlRow {
     pub shorturl: String,
     pub longurl: String,
-    pub created_at: NaiveDateTime,
+    pub created_at: DateTime<Utc>,
 }
