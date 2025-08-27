@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "generate:css": "tailwindcss -i ./tailwind.css -o ./static/styles.css"
+    "generate:css": "tailwindcss -i ./tailwind.css -o ./static/styles.css",
+    "format:maud": "maudfmt -m maud ./src/views/"
   },
   "devDependencies": {
     "tailwindcss": "^4.1.12"

@@ -48,20 +48,25 @@ impl LoginFormPage {
 impl Renderable for LoginFormPage {
     fn render_to(&self, buffer: &mut hypertext::Buffer<hypertext::context::Node>) {
         maud! {
-                Page title="Login" {
-                   main {
+            Page title="Login" {
+                main {
                     form action="/login" method="POST" {
-                        input type="email" name="email" placeholder= "email" required value=[&self.prepopulated_email];
-                         input type="password" name="password" placeholder= "***" required;
-                         @if let Some(redirect) = &self.redirect_to {
+                        input
+                            type="email"
+                            name="email"
+                            placeholder="email"
+                            required
+                            value=[&self.prepopulated_email];
+                        input type="password" name="password" placeholder="***" required;
+                        @if let Some(redirect) = &self.redirect_to {
                             input type="hidden" name="redirect_to" value=(redirect);
-                         }
-                         @if self.show_invalid_credentials {
+                        }
+                        @if self.show_invalid_credentials {
                             p class="text-red-500" { "Invalid email or password" }
-                         }
-                         button type="submit" { "Login" }
+                        }
+                        button type="submit" { "Login" }
                     }
-                   }
+                }
             }
         }
         .render_to(buffer);
