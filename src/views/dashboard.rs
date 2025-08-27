@@ -46,7 +46,7 @@ impl Renderable for DashboardPageBuilder {
                                     th class="px-6 py-3" { "Created At" }
                                 }
                             }
-                            tbody #urltablebody {
+                            tbody #urltablebody hx-on::after-swap="convertUtcTimeToLocal(event.target.children.item(0).children.item(2))" {
                                 @for row in &self.rows {
                                     UrlTableRow data=(row);
                                 }
@@ -132,7 +132,7 @@ impl<'a> Renderable for UrlTableRow<'a> {
                 td class="px-6 py-4" {
                     a href=(row.longurl) target="_blank" { (row.longurl) }
                 }
-                td class="px-6 py-4" { (row.created_at.to_string()) }
+                td class="px-6 py-4" data-time  { (row.created_at.to_string()) }
             }
         }.render_to(buffer);
     }
