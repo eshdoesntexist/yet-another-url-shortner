@@ -3,7 +3,6 @@
     "generate:css": "tailwindcss -i ./tailwind.css -o ./static/styles.css"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.1.12",
     "tailwindcss": "^4.1.12"
   }
 }
